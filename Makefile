@@ -23,7 +23,7 @@ CLEARML_ENV := --env CLEARML_API_URL --env CLEARML_ACCESS_KEY --env CLEARML_SECR
 
 .DEFAULT_GOAL := help
 
-.PHONY: help image image-refresh image-ensure cache-dirs check-docker terraform-version test build generate generate-check security testacc
+.PHONY: help image image-refresh image-ensure cache-dirs check-docker terraform-version test build generate generate-check security testacc cleanupacc
 
 help:
 	@printf '%s\n' \
@@ -36,7 +36,8 @@ help:
 		'  generate              Regenerate Terraform provider documentation.' \
 		'  generate-check        Regenerate documentation and fail on an uncommitted diff.' \
 		'  security              Run Go vulnerability, OSV, and waiver-policy checks.' \
-		'  testacc               Run credentialed acceptance tests (never run by CI).' \
+		'  testacc               Run credentialed ClearML acceptance tests.' \
+		'  cleanupacc            Delete CI-owned acceptance queues older than 24 hours.' \
 		'' \
 		'All development targets run in the devcontainer. Set TERRAFORM_VERSION=1.6.6' \
 		'to select the supported minimum Terraform version. Set TERRAFORM_IMAGE to an' \
@@ -71,6 +72,9 @@ security:
 
 testacc:
 	TF_ACC=1 go test ./... -v $(TESTARGS) -timeout 120m
+
+cleanupacc:
+	go run ./cmd/clearml-acceptance-cleanup
 
 else
 
@@ -121,7 +125,7 @@ define RUN_IN_DEVCONTAINER
 		$(CONTAINER_MAKE) --no-print-directory
 endef
 
-terraform-version test build generate generate-check security testacc: image-ensure cache-dirs
+terraform-version test build generate generate-check security testacc cleanupacc: image-ensure cache-dirs
 	$(RUN_IN_DEVCONTAINER) $@
 
 endif

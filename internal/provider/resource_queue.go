@@ -92,6 +92,14 @@ func (r *queueResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	var state queueResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	// Computed attributes are unknown in an update plan. The remote queue ID is
+	// therefore taken from the prior state, not plan.ID.
+	plan.ID = state.ID
 	tags, diagnostics := listStrings(ctx, plan.Tags)
 	resp.Diagnostics.Append(diagnostics...)
 	if resp.Diagnostics.HasError() {

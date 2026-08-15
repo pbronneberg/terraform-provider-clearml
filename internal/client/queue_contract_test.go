@@ -32,6 +32,10 @@ func TestQueueContract(t *testing.T) {
 			assertBearerToken(t, r)
 			assertPayload(t, r, map[string]any{"queue": "queue-123"})
 			writeFixture(t, w, "queues.get_by_id.json")
+		case "/queues.get_all":
+			assertBearerToken(t, r)
+			assertPayload(t, r, map[string]any{"name": "^tfacc-clearml-[0-9]{10}-.*$", "only_fields": []any{"id", "name"}, "page": float64(0), "page_size": float64(100)})
+			writeFixture(t, w, "queues.get_all.json")
 		case "/queues.update":
 			assertBearerToken(t, r)
 			assertPayload(t, r, map[string]any{"queue": "queue-123", "name": "renamed-queue", "tags": []any{"production"}})
@@ -62,6 +66,14 @@ func TestQueueContract(t *testing.T) {
 	queue, err := client.GetQueue(t.Context(), id)
 	if err != nil {
 		t.Fatalf("GetQueue() error = %v", err)
+	}
+
+	page, err := client.ListQueues(t.Context(), "^tfacc-clearml-[0-9]{10}-.*$", 0, 100)
+	if err != nil {
+		t.Fatalf("ListQueues() error = %v", err)
+	}
+	if len(page.Queues) != 1 || page.Queues[0].ID != "queue-123" || page.Queues[0].Name != "example-queue" {
+		t.Fatalf("ListQueues() = %#v, want one example queue", page)
 	}
 	if queue.Name != "example-queue" {
 		t.Fatalf("GetQueue() name = %q, want example-queue", queue.Name)
