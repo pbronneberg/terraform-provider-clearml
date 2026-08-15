@@ -2,70 +2,44 @@ package client
 
 import (
 	"context"
+	"net/http"
 )
 
+// Queue is the ClearML queue representation required by this provider.
+type Queue struct {
+	ID   string   `json:"id"`
+	Name string   `json:"name"`
+	Tags []string `json:"tags"`
+}
+
 func (c *ClearMLClient) CreateQueue(ctx context.Context, name string, tags []string) (string, error) {
-
-	payload := map[string]interface{}{
-		"name": name,
-		"tags": tags,
+	var response struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
 	}
-
-	res, err := c.request(ctx, "POST", "/queues.create", nil, payload)
-
-	if err != nil {
+	if err := c.request(ctx, http.MethodPost, "/queues.create", map[string]any{"name": name, "tags": tags}, &response); err != nil {
 		return "", err
 	}
-
-	dataObj := res.(map[string]interface{})
-	queueObj := dataObj["data"].(map[string]interface{})
-
-	return queueObj["id"].(string), nil
+	return response.Data.ID, nil
 }
 
-func (c *ClearMLClient) GetQueue(ctx context.Context, id string) (map[string]interface{}, error) {
-	payload := map[string]interface{}{
-		"queue": id,
+func (c *ClearMLClient) GetQueue(ctx context.Context, id string) (Queue, error) {
+	var response struct {
+		Data struct {
+			Queue Queue `json:"queue"`
+		} `json:"data"`
 	}
-
-	res, err := c.request(ctx, "POST", "/queues.get_by_id", nil, payload)
-
-	if err != nil {
-		return nil, err
+	if err := c.request(ctx, http.MethodPost, "/queues.get_by_id", map[string]any{"queue": id}, &response); err != nil {
+		return Queue{}, err
 	}
-
-	dataObj := res.(map[string]interface{})
-	queueObj := dataObj["data"].(map[string]interface{})
-
-	return queueObj["queue"].(map[string]interface{}), nil
+	return response.Data.Queue, nil
 }
 
-func (c *ClearMLClient) UpdateQueue(ctx context.Context, id string, name string, tags []string) error {
-	payload := map[string]interface{}{
-		"queue": id,
-		"name": name,
-		"tags": tags,
-	}
-
-	_, err := c.request(ctx, "POST", "/queues.update", nil, payload)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (c *ClearMLClient) UpdateQueue(ctx context.Context, id, name string, tags []string) error {
+	return c.request(ctx, http.MethodPost, "/queues.update", map[string]any{"queue": id, "name": name, "tags": tags}, nil)
 }
 
 func (c *ClearMLClient) DeleteQueue(ctx context.Context, id string) error {
-	payload := map[string]interface{}{
-		"queue": id,
-	}
-
-	_, err := c.request(ctx, "POST", "/queues.delete", nil, payload)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.request(ctx, http.MethodPost, "/queues.delete", map[string]any{"queue": id}, nil)
 }

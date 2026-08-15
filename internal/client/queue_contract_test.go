@@ -63,8 +63,8 @@ func TestQueueContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetQueue() error = %v", err)
 	}
-	if queue["name"] != "example-queue" {
-		t.Fatalf("GetQueue() name = %v, want example-queue", queue["name"])
+	if queue.Name != "example-queue" {
+		t.Fatalf("GetQueue() name = %q, want example-queue", queue.Name)
 	}
 
 	if err := client.UpdateQueue(t.Context(), id, "renamed-queue", []string{"production"}); err != nil {
