@@ -11,3 +11,5 @@ Before cutting a release, the release owner must perform this checklist against 
 5. Remove the resource and confirm it is deleted; record any API response or schema discrepancy in the release issue before publishing.
 
 The evidence must name the ClearML endpoint, Server version (for self-hosted), Terraform version, provider tag, date, and executor. Never commit credentials, access tokens, or production queue identifiers.
+
+The tag must be created from `main`, and the release process must follow the controls in [release trust](release-trust.md). Record the issue or pull request that approved the release with the live-verification evidence.

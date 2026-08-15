@@ -30,7 +30,7 @@ go generate ./...
 go build ./...
 ```
 
-The provider has fixture-based HTTP contract tests and intentionally does not use ClearML credentials in CI. See [the verification checklist](docs/verification.md) for the release-owner live validation procedure.
+The provider has fixture-based HTTP contract tests and intentionally does not use ClearML credentials in CI. See [the verification checklist](docs/verification.md) for the release-owner live validation procedure and [the release-trust guide](docs/release-trust.md) for signing, approval, provenance, and verification requirements.
 
 ## Dependency maintenance
 
