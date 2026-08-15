@@ -1,0 +1,10 @@
+{
+  "data": {
+    "queues": [
+      {
+        "id": "queue-123",
+        "name": "example-queue"
+      }
+    ]
+  }
+}

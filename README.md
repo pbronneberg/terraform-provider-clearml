@@ -44,12 +44,25 @@ supported minimum version, set `TERRAFORM_VERSION=1.6.6`, for example:
 make test TERRAFORM_VERSION=1.6.6
 ```
 
-`make testacc` runs live acceptance tests and is intentionally excluded from
-CI. It requires an explicitly supplied non-production ClearML account through
-`CLEARML_ACCESS_KEY`, `CLEARML_SECRET_KEY`, and, when needed,
-`CLEARML_API_URL`.
+`make testacc` runs live acceptance tests. It requires an explicitly supplied
+ClearML account through `CLEARML_ACCESS_KEY`, `CLEARML_SECRET_KEY`, and, when
+needed, `CLEARML_API_URL`.
 
-The provider has fixture-based HTTP contract tests and intentionally does not use ClearML credentials in CI. See [the verification checklist](docs/verification.md) for the release-owner live validation procedure and [the release-trust guide](docs/release-trust.md) for signing, approval, provenance, and verification requirements.
+CI runs the queue lifecycle acceptance test against ClearML hosted on pushes to
+`main`, scheduled runs, and pull requests from this repository. Fork pull
+requests run the non-credentialed checks only. The workflow maps its GitHub
+secrets `CLEARML_ACCESSKEY` and `CLEARML_SECRETKEY` to the provider's
+underscored environment variable names.
+
+Acceptance queues are named `tfacc-clearml-<timestamp>-<terraform-version>-<run-id>-<attempt>-<random-id>`.
+`make cleanupacc` removes only queues with that exact CI-owned format when they
+are older than 24 hours. It never force-deletes queues; if cleanup fails, keep
+the reported queue for diagnosis and delete it manually from ClearML once it is
+known to be empty.
+
+The provider has fixture-based HTTP contract tests in addition to hosted CI
+acceptance coverage. See [the verification checklist](docs/verification.md) for
+the release-owner live validation procedure and [the release-trust guide](docs/release-trust.md) for signing, approval, provenance, and verification requirements.
 
 ## Dependency maintenance
 

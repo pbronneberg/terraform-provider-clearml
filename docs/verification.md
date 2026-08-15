@@ -1,6 +1,6 @@
 # ClearML v1 release verification
 
-CI proves the provider against versioned HTTP fixtures, including the queue response surface represented by ClearML Server 3.28.8. It does not use ClearML credentials or claim live-service compatibility.
+CI proves the provider against versioned HTTP fixtures, including the queue response surface represented by ClearML Server 3.28.8. On trusted repository pull requests, `main`, and scheduled runs, it also exercises the hosted ClearML queue lifecycle with both supported Terraform versions. Fork pull requests never receive ClearML credentials. Hosted CI validates the queue lifecycle only; it does not claim compatibility beyond the covered API surface.
 
 Before cutting a release, the release owner must perform this checklist against both `https://api.clear.ml` and the selected current self-hosted ClearML Server:
 
