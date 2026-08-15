@@ -1,0 +1,4 @@
+{
+  "meta": {"id": "auth.login", "result_code": 200, "result_msg": "OK"},
+  "data": {"token": "test-token"}
+}

@@ -1,51 +1,72 @@
-# This GitHub action can publish assets for release when a tag is created.
-# Currently its setup to run on any tag that matches the pattern "v*" (ie. v0.1.0).
-#
-# This uses an action (hashicorp/ghaction-import-gpg) that assumes you set your 
-# private key in the `GPG_PRIVATE_KEY` secret and passphrase in the `PASSPHRASE`
-# secret. If you would rather own your own GPG handling, please fork this action
-# or use an alternative one for key handling.
-#
-# You will need to pass the `--batch` flag to `gpg` in your signing step 
-# in `goreleaser` to indicate this is being used in a non-interactive mode.
-#
-name: release
+name: Release
+
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ["v*"]
+
 permissions:
   contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
 jobs:
-  goreleaser:
+  release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: release
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-      -
-        name: Unshallow
-        run: git fetch --prune --unshallow
-      -
-        name: Set up Go
-        uses: actions/setup-go@v3
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          go-version-file: 'go.mod'
+          fetch-depth: 0
+      - name: Verify release tag is reachable from main
+        shell: bash
+        run: |
+          release_commit="$(git rev-parse "${GITHUB_REF}^{commit}")"
+          git merge-base --is-ancestor "$release_commit" origin/main
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
           cache: true
-      -
-        name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v5
+      - uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
         id: import_gpg
         with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.PASSPHRASE }}
-      -
-        name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3.1.0
+          # This must be a dedicated release signing subkey, not a maintainer's
+          # everyday commit-signing key. The environment scopes these secrets to
+          # version-tag deployments.
+          gpg_private_key: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
-          version: latest
-          args: release --rm-dist
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
         env:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-          # GitHub sets this automatically
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.20.0
+        with:
+          path: .
+          format: spdx-json
+          output-file: release-sbom.spdx.json
+      - name: Attach source dependency SBOM to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" release-sbom.spdx.json --clobber
+      - name: Locate GoReleaser checksum manifest
+        id: checksums
+        shell: bash
+        run: |
+          checksum="$(find dist -maxdepth 1 -type f -name '*_SHA256SUMS' -print -quit)"
+          test -n "$checksum"
+          echo "path=$checksum" >> "$GITHUB_OUTPUT"
+      - name: Attest release provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-checksums: ${{ steps.checksums.outputs.path }}
+      - name: Attest source dependency SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: dist/*.zip
+          sbom-path: release-sbom.spdx.json

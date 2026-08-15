@@ -1,0 +1,4 @@
+{
+  "meta": {"id": "queues.create", "result_code": 200, "result_msg": "OK"},
+  "data": {"id": "queue-123"}
+}

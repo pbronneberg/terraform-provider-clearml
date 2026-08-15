@@ -1,31 +1,24 @@
 package provider
 
 import (
-	"regexp"
+	"context"
+	"reflect"
 	"testing"
 
-	"github.com/healx/terraform-provider-clearml/internal/template"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func TestAccResourceQueue_basic(t *testing.T) {
-	resource.UnitTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t) },
-		ProviderFactories: providerFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: template.ParseRandName(testAccResourceQueue),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestMatchResourceAttr(
-						"clearml_queue.foo", "name", regexp.MustCompile("^terraform-test")),
-				),
-			},
-		},
-	})
+func TestListStrings(t *testing.T) {
+	t.Parallel()
+	list, diagnostics := types.ListValueFrom(context.Background(), types.StringType, []string{"one", "two"})
+	if diagnostics.HasError() {
+		t.Fatalf("ListValueFrom() diagnostics = %v", diagnostics)
+	}
+	got, diagnostics := listStrings(context.Background(), list)
+	if diagnostics.HasError() {
+		t.Fatalf("listStrings() diagnostics = %v", diagnostics)
+	}
+	if !reflect.DeepEqual(got, []string{"one", "two"}) {
+		t.Fatalf("listStrings() = %v, want [one two]", got)
+	}
 }
-
-const testAccResourceQueue = `
-resource "clearml_queue" "foo" {
-  name = "terraform-test-{{.randName}}"
-}
-`

@@ -2,71 +2,95 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"os"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	frameworkprovider "github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/healx/terraform-provider-clearml/internal/client"
 )
 
-func init() {
-	// Set descriptions to support markdown syntax, this will be used in document generation
-	// and the language server.
-	schema.DescriptionKind = schema.StringMarkdown
+type clearmlProvider struct {
+	version string
 }
 
-func New(version string) func() *schema.Provider {
-	return func() *schema.Provider {
-		p := &schema.Provider{
-			Schema: map[string]*schema.Schema{
-				"api_url": {
-					Type:     schema.TypeString,
-					Optional: true,
-					DefaultFunc: schema.MultiEnvDefaultFunc([]string{
-						"CLEARML_API_URL",
-					}, "https://api.clear.ml"),
-				},
-				"access_key": {
-					Type:     schema.TypeString,
-					Required: true,
-					DefaultFunc: schema.MultiEnvDefaultFunc([]string{
-						"CLEARML_ACCESS_KEY",
-					}, nil),
-				},
-				"secret_key": {
-					Type:     schema.TypeString,
-					Required: true,
-					DefaultFunc: schema.MultiEnvDefaultFunc([]string{
-						"CLEARML_SECRET_KEY",
-					}, nil),
-				},
-			},
-			DataSourcesMap: map[string]*schema.Resource{
+type providerModel struct {
+	APIURL    types.String `tfsdk:"api_url"`
+	AccessKey types.String `tfsdk:"access_key"`
+	SecretKey types.String `tfsdk:"secret_key"`
+}
 
-			},
-			ResourcesMap: map[string]*schema.Resource{
-				"clearml_queue": resourceQueue(),
-			},
-		}
+func New(version string) func() frameworkprovider.Provider {
+	return func() frameworkprovider.Provider { return &clearmlProvider{version: version} }
+}
 
-		p.ConfigureContextFunc = configure(version, p)
+func (p *clearmlProvider) Metadata(_ context.Context, _ frameworkprovider.MetadataRequest, resp *frameworkprovider.MetadataResponse) {
+	resp.TypeName = "clearml"
+	resp.Version = p.version
+}
 
-		return p
+func (p *clearmlProvider) Schema(_ context.Context, _ frameworkprovider.SchemaRequest, resp *frameworkprovider.SchemaResponse) {
+	resp.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
+		"api_url": schema.StringAttribute{
+			Optional:    true,
+			Description: "ClearML API URL. Defaults to https://api.clear.ml.",
+		},
+		"access_key": schema.StringAttribute{
+			Optional:    true,
+			Sensitive:   true,
+			Description: "ClearML access key. Defaults to CLEARML_ACCESS_KEY when unset.",
+		},
+		"secret_key": schema.StringAttribute{
+			Optional:    true,
+			Sensitive:   true,
+			Description: "ClearML secret key. Defaults to CLEARML_SECRET_KEY when unset.",
+		},
+	}}
+}
+
+func (p *clearmlProvider) Configure(ctx context.Context, req frameworkprovider.ConfigureRequest, resp *frameworkprovider.ConfigureResponse) {
+	var config providerModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
-}
 
-func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
-	return func(ctx context.Context, d *schema.ResourceData) (any, diag.Diagnostics) {
-		userAgent := p.UserAgent("terraform-provider-clearml", version)
-		c, err := client.NewClearMLClient(
-			ctx, 
-			userAgent,
-			d.Get("access_key").(string), 
-			d.Get("secret_key").(string),
-			d.Get("api_url").(string))
-
-		if err != nil {
-			return nil, diag.FromErr(err)
-		}
-		return c, nil
+	apiURL := configuredValue(config.APIURL, "CLEARML_API_URL", "https://api.clear.ml")
+	accessKey := configuredValue(config.AccessKey, "CLEARML_ACCESS_KEY", "")
+	secretKey := configuredValue(config.SecretKey, "CLEARML_SECRET_KEY", "")
+	if accessKey == "" || secretKey == "" {
+		resp.Diagnostics.AddError("Missing ClearML credentials", "Set access_key and secret_key or the CLEARML_ACCESS_KEY and CLEARML_SECRET_KEY environment variables.")
+		return
 	}
+
+	c, err := client.NewClearMLClient(ctx, fmt.Sprintf("terraform-provider-clearml/%s", p.version), accessKey, secretKey, apiURL)
+	if err != nil {
+		resp.Diagnostics.AddError("Configure ClearML client", err.Error())
+		return
+	}
+	resp.DataSourceData = c
+	resp.ResourceData = c
 }
+
+func (p *clearmlProvider) Resources(_ context.Context) []func() resource.Resource {
+	return []func() resource.Resource{newQueueResource}
+}
+
+func (p *clearmlProvider) DataSources(context.Context) []func() datasource.DataSource {
+	return nil
+}
+
+func configuredValue(value types.String, environmentVariable, fallback string) string {
+	if !value.IsNull() && !value.IsUnknown() && value.ValueString() != "" {
+		return value.ValueString()
+	}
+	if environmentValue := os.Getenv(environmentVariable); environmentValue != "" {
+		return environmentValue
+	}
+	return fallback
+}
+
+var _ frameworkprovider.Provider = &clearmlProvider{}

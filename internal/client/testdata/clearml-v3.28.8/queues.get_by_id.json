@@ -1,0 +1,10 @@
+{
+  "meta": {"id": "queues.get_by_id", "result_code": 200, "result_msg": "OK"},
+  "data": {
+    "queue": {
+      "id": "queue-123",
+      "name": "example-queue",
+      "tags": ["production", "gpu"]
+    }
+  }
+}
