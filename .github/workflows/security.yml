@@ -1,0 +1,52 @@
+name: Supply-chain security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Reachability-aware Go vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+      - name: OSV dependency scan
+        run: go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.5.0 scan source --format json --output osv-results.json . || true
+      - name: Enforce high and critical vulnerability policy
+        run: python3 scripts/check_vulnerability_waivers.py osv-results.json .security/vulnerability-waivers.yaml
+      - uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.20.0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
+
+  submit-sbom:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: sbom
+      - uses: advanced-security/spdx-dependency-submission-action@af889147caa602135830f4848557237a5d9139f7 # v0.1.0
+        with:
+          filePath: sbom.spdx.json
