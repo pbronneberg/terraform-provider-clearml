@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/healx/terraform-provider-clearml/internal/client"
+	"github.com/pbronneberg/terraform-provider-clearml/internal/client"
 )
 
 type clearmlProvider struct {
