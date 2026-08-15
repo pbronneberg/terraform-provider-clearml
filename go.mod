@@ -1,6 +1,6 @@
 module github.com/healx/terraform-provider-clearml
 
-go 1.26.0
+go 1.26.6
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.25.0
