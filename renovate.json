@@ -15,7 +15,9 @@
     {
       "customType": "regex",
       "description": "Keep Terraform images used by the devcontainer and Make targets pinned and up to date.",
-      "fileMatch": ["^(Makefile|\\.devcontainer/Dockerfile)$"],
+      "managerFilePatterns": [
+        "/^(Makefile|\\.devcontainer/Dockerfile)$/"
+      ],
       "matchStrings": [
         "TERRAFORM_IMAGE_1_15_8 := (?<depName>hashicorp/terraform):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]+)",
         "ARG TERRAFORM_IMAGE=(?<depName>hashicorp/terraform):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]+)"
