@@ -1,4 +1,4 @@
-module github.com/healx/terraform-provider-clearml
+module github.com/pbronneberg/terraform-provider-clearml
 
 go 1.26.6
 

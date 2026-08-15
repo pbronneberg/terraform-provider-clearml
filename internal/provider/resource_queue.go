@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/healx/terraform-provider-clearml/internal/client"
+	"github.com/pbronneberg/terraform-provider-clearml/internal/client"
 )
 
 type queueResource struct{ client *client.ClearMLClient }

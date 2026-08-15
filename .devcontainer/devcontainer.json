@@ -1,0 +1,21 @@
+{
+  "name": "ClearML Terraform Provider",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/terraform-provider-clearml,type=bind",
+  "workspaceFolder": "/workspace/terraform-provider-clearml",
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "IN_DEVCONTAINER": "1"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "hashicorp.terraform"
+      ]
+    }
+  }
+}

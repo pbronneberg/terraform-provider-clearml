@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/healx/terraform-provider-clearml/internal/provider"
+	"github.com/pbronneberg/terraform-provider-clearml/internal/provider"
 )
 
 //go:generate terraform fmt -recursive ./examples/
@@ -20,7 +20,7 @@ func main() {
 	flag.Parse()
 
 	err := providerserver.Serve(context.Background(), provider.New(version), providerserver.ServeOpts{
-		Address: "registry.terraform.io/healx/clearml",
+		Address: "registry.terraform.io/pbronneberg/clearml",
 		Debug:   debugMode,
 	})
 	if err != nil {

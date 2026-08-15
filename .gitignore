@@ -1,6 +1,7 @@
 *.dll
 *.exe
 .DS_Store
+.cache/
 example.tf
 terraform.tfplan
 terraform.tfstate
