@@ -1,49 +1,37 @@
 # ClearML Terraform Provider
 
+Terraform provider for managing ClearML queues through the documented ClearML REST API.
+
 ## Requirements
 
--	[Terraform](https://www.terraform.io/downloads.html) >= 0.13.x
--	[Go](https://golang.org/doc/install) >= 1.18
+- Terraform `>= 1.6`
+- Go `1.26` for local development
+- ClearML hosted (`https://api.clear.ml`) or a compatible self-hosted API
 
-## Building The Provider
+The v1 provider uses Terraform Plugin Framework and protocol v6. Existing `clearml_queue` configuration, import IDs, and state attributes (`id`, `name`, and `tags`) are preserved from the SDKv2 provider.
 
-1. Clone the repository
-1. Enter the repository directory
-1. Build the provider using the Go `install` command: 
-```sh
-$ go install
+## Configuration
+
+```hcl
+provider "clearml" {
+  # api_url    = "https://api.clear.ml" # optional
+  # access_key = var.clearml_access_key  # optional when environment is set
+  # secret_key = var.clearml_secret_key  # optional when environment is set
+}
 ```
 
-## Adding Dependencies
+When omitted, `api_url` defaults to `https://api.clear.ml`; credentials are read from `CLEARML_ACCESS_KEY` and `CLEARML_SECRET_KEY`. Set `CLEARML_API_URL` to target a self-hosted API.
 
-This provider uses [Go modules](https://github.com/golang/go/wiki/Modules).
-Please see the Go documentation for the most up to date information about using Go modules.
-
-To add a new dependency `github.com/author/dependency` to your Terraform provider:
-
-```
-go get github.com/author/dependency
-go mod tidy
-```
-
-Then commit the changes to `go.mod` and `go.sum`.
-
-## Using the provider
-
-Fill this in for each provider
-
-## Developing the Provider
-
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements) above).
-
-To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
-
-To generate or update documentation, run `go generate`.
-
-In order to run the full suite of Acceptance tests, run `make testacc`.
-
-*Note:* Acceptance tests create real resources, and often cost money to run.
+## Development
 
 ```sh
-$ make testacc
+go test -race ./...
+go generate ./...
+go build ./...
 ```
+
+The provider has fixture-based HTTP contract tests and intentionally does not use ClearML credentials in CI. See [the verification checklist](docs/verification.md) for the release-owner live validation procedure.
+
+## Dependency maintenance
+
+Renovate proposes reviewed dependency updates weekly after a seven-day cooling period. Security alerts may bypass that delay but never auto-merge. Repository administrators must install the Renovate GitHub App for this configuration to run. See [the supply-chain review skill](.github/skills/dependency-supply-chain-review/SKILL.md) for the review workflow.
