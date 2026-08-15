@@ -11,12 +11,31 @@
   "branchConcurrentLimit": 3,
   "automerge": false,
   "labels": ["dependencies"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Keep Terraform images used by the devcontainer and Make targets pinned and up to date.",
+      "fileMatch": ["^(Makefile|\\.devcontainer/Dockerfile)$"],
+      "matchStrings": [
+        "TERRAFORM_IMAGE_1_15_8 := (?<depName>hashicorp/terraform):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]+)",
+        "ARG TERRAFORM_IMAGE=(?<depName>hashicorp/terraform):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
   "packageRules": [
     {
       "description": "Group routine Go and action updates for reviewed maintenance.",
       "matchManagers": ["gomod", "github-actions"],
       "matchUpdateTypes": ["patch", "minor", "digest"],
       "groupName": "routine dependencies"
+    },
+    {
+      "description": "Maintain the immutable digest for the declared default Terraform compatibility version.",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["hashicorp/terraform"],
+      "allowedVersions": "1.15.8"
     },
     {
       "description": "Keep major updates independently reviewable.",
