@@ -23,7 +23,7 @@ jobs:
       - name: Reachability-aware Go vulnerability scan
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
       - name: OSV dependency scan
-        run: go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.5.0 scan source --format json --output osv-results.json . || true
+        run: go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.5.0 scan source --format json --output-file osv-results.json . || true
       - name: Enforce high and critical vulnerability policy
         run: python3 scripts/check_vulnerability_waivers.py osv-results.json .security/vulnerability-waivers.yaml
       - uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.20.0
