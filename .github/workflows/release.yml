@@ -29,14 +29,30 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
+      - name: Import release signing key
         id: import_gpg
-        with:
+        shell: bash
+        env:
           # This must be a dedicated release signing subkey, not a maintainer's
           # everyday commit-signing key. The environment scopes these secrets to
           # version-tag deployments.
-          gpg_private_key: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+          GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$RUNNER_TEMP/release-gnupg"
+          install -d -m 700 "$GNUPGHOME"
+          printf '%s\n' allow-loopback-pinentry > "$GNUPGHOME/gpg-agent.conf"
+          printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          fingerprint="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+          test -n "$fingerprint"
+          printf '%s\n' "$fingerprint" > "$RUNNER_TEMP/release-signing-key-check"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+            --local-user "$fingerprint" --output "$RUNNER_TEMP/release-signing-key-check.sig" \
+            --detach-sign "$RUNNER_TEMP/release-signing-key-check"
+          rm -f "$RUNNER_TEMP/release-signing-key-check" "$RUNNER_TEMP/release-signing-key-check.sig"
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
           distribution: goreleaser
