@@ -1,1 +1,1 @@
-terraform import clearml_queue.example acbd18db4cc2f85cedef654fccc4a4d8
+terraform import clearml_queue.example queue-id

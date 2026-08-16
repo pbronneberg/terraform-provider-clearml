@@ -2,12 +2,17 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/pbronneberg/terraform-provider-clearml/internal/client"
 )
@@ -15,9 +20,11 @@ import (
 type queueResource struct{ client *client.ClearMLClient }
 
 type queueResourceModel struct {
-	ID   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"name"`
-	Tags types.List   `tfsdk:"tags"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	DisplayName types.String `tfsdk:"display_name"`
+	Tags        types.Set    `tfsdk:"tags"`
+	Metadata    types.Map    `tfsdk:"metadata"`
 }
 
 func newQueueResource() resource.Resource { return &queueResource{} }
@@ -27,37 +34,58 @@ func (r *queueResource) Metadata(_ context.Context, req resource.MetadataRequest
 }
 
 func (r *queueResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{Description: "A queue in ClearML.", Attributes: map[string]schema.Attribute{
-		"id":   schema.StringAttribute{Computed: true},
-		"name": schema.StringAttribute{Required: true, Description: "The name of the queue."},
-		"tags": schema.ListAttribute{Optional: true, ElementType: types.StringType, Description: "Tags to set on the queue."},
-	}}
+	resp.Schema = schema.Schema{
+		Description: "A ClearML task execution queue.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{Computed: true},
+			"name": schema.StringAttribute{
+				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
+				Description: "The unique queue name.",
+			},
+			"display_name": schema.StringAttribute{
+				Optional: true, Computed: true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Description:   "An optional human-readable queue name. Omit it to preserve the remote value.",
+			},
+			"tags": schema.SetAttribute{
+				Optional: true, Computed: true, ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Set{setplanmodifier.UseStateForUnknown()},
+				Description:   "User-defined tags. Omit them to preserve the remote value.",
+			},
+			"metadata": schema.MapAttribute{
+				Optional: true, Computed: true,
+				ElementType:   types.ObjectType{AttrTypes: metadataItemTypes},
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				Description:   "Typed metadata keyed by metadata key. Omit it to preserve the remote value.",
+			},
+		},
+	}
 }
 
 func (r *queueResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	c, ok := req.ProviderData.(*client.ClearMLClient)
-	if !ok {
-		resp.Diagnostics.AddError("Unexpected resource configure type", fmt.Sprintf("Expected *client.ClearMLClient, got %T.", req.ProviderData))
-		return
-	}
-	r.client = c
+	r.client = configuredClient(req.ProviderData, &resp.Diagnostics, "resource")
+}
+
+func queueInput(ctx context.Context, model queueResourceModel) (client.QueueInput, diag.Diagnostics) {
+	tags, diagnostics := setStrings(ctx, model.Tags)
+	metadata, metadataDiagnostics := metadataItems(ctx, model.Metadata)
+	diagnostics.Append(metadataDiagnostics...)
+	return client.QueueInput{
+		Name: model.Name.ValueString(), DisplayName: optionalString(model.DisplayName),
+		Tags: tags, Metadata: metadata,
+	}, diagnostics
 }
 
 func (r *queueResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan queueResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	tags, diagnostics := listStrings(ctx, plan.Tags)
+	input, diagnostics := queueInput(ctx, plan)
 	resp.Diagnostics.Append(diagnostics...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	id, err := r.client.CreateQueue(ctx, plan.Name.ValueString(), tags)
+	id, err := r.client.CreateQueue(ctx, input)
 	if err != nil {
 		resp.Diagnostics.AddError("Create ClearML queue", err.Error())
 		return
@@ -75,37 +103,26 @@ func (r *queueResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	r.read(ctx, &state, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if state.ID.IsNull() {
+	if !r.read(ctx, &state, &resp.Diagnostics) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	if !resp.Diagnostics.HasError() {
+		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	}
 }
 
 func (r *queueResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan queueResourceModel
+	var plan, state queueResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	var state queueResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	// Computed attributes are unknown in an update plan. The remote queue ID is
-	// therefore taken from the prior state, not plan.ID.
 	plan.ID = state.ID
-	tags, diagnostics := listStrings(ctx, plan.Tags)
+	input, diagnostics := queueInput(ctx, plan)
 	resp.Diagnostics.Append(diagnostics...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.UpdateQueue(ctx, plan.ID.ValueString(), plan.Name.ValueString(), tags); err != nil {
+	if err := r.client.UpdateQueue(ctx, state.ID.ValueString(), input); err != nil {
 		resp.Diagnostics.AddError("Update ClearML queue", err.Error())
 		return
 	}
@@ -122,7 +139,7 @@ func (r *queueResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 	if err := r.client.DeleteQueue(ctx, state.ID.ValueString()); err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete ClearML queue", err.Error())
+		resp.Diagnostics.AddError("Delete ClearML queue", "ClearML refused the safe non-force deletion. Ensure the queue is empty. "+err.Error())
 	}
 }
 
@@ -130,33 +147,25 @@ func (r *queueResource) ImportState(ctx context.Context, req resource.ImportStat
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (r *queueResource) read(ctx context.Context, state *queueResourceModel, diagnostics *diag.Diagnostics) {
+func (r *queueResource) read(ctx context.Context, state *queueResourceModel, diagnostics *diag.Diagnostics) bool {
 	queue, err := r.client.GetQueue(ctx, state.ID.ValueString())
 	if client.IsNotFound(err) {
-		state.ID = types.StringNull()
-		return
+		return false
 	}
 	if err != nil {
 		diagnostics.AddError("Read ClearML queue", err.Error())
-		return
+		return true
 	}
-	tags, tagDiagnostics := types.ListValueFrom(ctx, types.StringType, queue.Tags)
+	tags, tagDiagnostics := stringSet(ctx, queue.Tags)
+	metadata, metadataDiagnostics := metadataMap(ctx, queue.Metadata)
 	diagnostics.Append(tagDiagnostics...)
-	if diagnostics.HasError() {
-		return
-	}
+	diagnostics.Append(metadataDiagnostics...)
 	state.ID = types.StringValue(queue.ID)
 	state.Name = types.StringValue(queue.Name)
+	state.DisplayName = types.StringValue(queue.DisplayName)
 	state.Tags = tags
-}
-
-func listStrings(ctx context.Context, list types.List) ([]string, diag.Diagnostics) {
-	if list.IsNull() || list.IsUnknown() {
-		return nil, nil
-	}
-	var values []string
-	diagnostics := list.ElementsAs(ctx, &values, false)
-	return values, diagnostics
+	state.Metadata = metadata
+	return true
 }
 
 var _ resource.Resource = &queueResource{}

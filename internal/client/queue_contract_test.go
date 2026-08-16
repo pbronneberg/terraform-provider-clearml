@@ -26,7 +26,11 @@ func TestQueueContract(t *testing.T) {
 			writeFixture(t, w, "auth.login.json")
 		case "/queues.create":
 			assertBearerToken(t, r)
-			assertPayload(t, r, map[string]any{"name": "example-queue", "tags": []any{"production", "gpu"}})
+			assertPayload(t, r, map[string]any{
+				"name": "example-queue", "display_name": "Example queue",
+				"tags":     []any{"production", "gpu"},
+				"metadata": map[string]any{"owner": map[string]any{"key": "owner", "type": "string", "value": "ml-platform"}},
+			})
 			writeFixture(t, w, "queues.create.json")
 		case "/queues.get_by_id":
 			assertBearerToken(t, r)
@@ -38,11 +42,14 @@ func TestQueueContract(t *testing.T) {
 			writeFixture(t, w, "queues.get_all.json")
 		case "/queues.update":
 			assertBearerToken(t, r)
-			assertPayload(t, r, map[string]any{"queue": "queue-123", "name": "renamed-queue", "tags": []any{"production"}})
+			assertPayload(t, r, map[string]any{
+				"queue": "queue-123", "name": "renamed-queue", "display_name": "",
+				"tags": []any{}, "metadata": map[string]any{},
+			})
 			writeFixture(t, w, "empty.json")
 		case "/queues.delete":
 			assertBearerToken(t, r)
-			assertPayload(t, r, map[string]any{"queue": "queue-123"})
+			assertPayload(t, r, map[string]any{"queue": "queue-123", "force": false})
 			writeFixture(t, w, "empty.json")
 		default:
 			t.Fatalf("unexpected endpoint: %s", r.URL.Path)
@@ -55,7 +62,10 @@ func TestQueueContract(t *testing.T) {
 		t.Fatalf("NewClearMLClient() error = %v", err)
 	}
 
-	id, err := client.CreateQueue(t.Context(), "example-queue", []string{"production", "gpu"})
+	displayName := "Example queue"
+	tags := []string{"production", "gpu"}
+	metadata := map[string]MetadataItem{"owner": {Key: "owner", Type: "string", Value: "ml-platform"}}
+	id, err := client.CreateQueue(t.Context(), QueueInput{Name: "example-queue", DisplayName: &displayName, Tags: &tags, Metadata: &metadata})
 	if err != nil {
 		t.Fatalf("CreateQueue() error = %v", err)
 	}
@@ -79,7 +89,10 @@ func TestQueueContract(t *testing.T) {
 		t.Fatalf("GetQueue() name = %q, want example-queue", queue.Name)
 	}
 
-	if err := client.UpdateQueue(t.Context(), id, "renamed-queue", []string{"production"}); err != nil {
+	emptyName := ""
+	emptyTags := []string{}
+	emptyMetadata := map[string]MetadataItem{}
+	if err := client.UpdateQueue(t.Context(), id, QueueInput{Name: "renamed-queue", DisplayName: &emptyName, Tags: &emptyTags, Metadata: &emptyMetadata}); err != nil {
 		t.Fatalf("UpdateQueue() error = %v", err)
 	}
 	if err := client.DeleteQueue(t.Context(), id); err != nil {

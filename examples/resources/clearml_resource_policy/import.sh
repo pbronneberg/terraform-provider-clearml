@@ -1,0 +1,1 @@
+terraform import clearml_resource_policy.interactive_gpu resource-policy-id

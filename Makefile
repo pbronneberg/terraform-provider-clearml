@@ -19,11 +19,13 @@ DEVCONTAINER_CACHE_DIR ?= $(CURDIR)/.cache/devcontainer
 WORKSPACE_DIR := /workspace/terraform-provider-clearml
 USER_ID := $(shell id -u)
 GROUP_ID := $(shell id -g)
-CLEARML_ENV := --env CLEARML_API_URL --env CLEARML_ACCESS_KEY --env CLEARML_SECRET_KEY
+CLEARML_ENV := --env CLEARML_API_HOST --env CLEARML_API_ACCESS_KEY --env CLEARML_API_SECRET_KEY \
+	--env CLEARML_ENTERPRISE_ACC --env CLEARML_ENTERPRISE_TEST_GROUP_ID \
+	--env CLEARML_ENTERPRISE_TEST_PROFILE_ID
 
 .DEFAULT_GOAL := help
 
-.PHONY: help image image-refresh image-ensure cache-dirs check-docker terraform-version test build generate generate-check security testacc cleanupacc
+.PHONY: help image image-refresh image-ensure cache-dirs check-docker terraform-version test lint build generate generate-check validate-examples security testacc cleanupacc
 
 help:
 	@printf '%s\n' \
@@ -32,9 +34,11 @@ help:
 		'  image-refresh         Rebuild the selected devcontainer image from fresh layers.' \
 		'  terraform-version     Print the Terraform version in the devcontainer.' \
 		'  test                  Run race-enabled Go tests.' \
+		'  lint                  Run Go static analysis.' \
 		'  build                 Build the provider.' \
 		'  generate              Regenerate Terraform provider documentation.' \
 		'  generate-check        Regenerate documentation and fail on an uncommitted diff.' \
+		'  validate-examples     Validate every example against the development provider.' \
 		'  security              Run Go vulnerability, OSV, and waiver-policy checks.' \
 		'  testacc               Run credentialed ClearML acceptance tests.' \
 		'  cleanupacc            Delete CI-owned acceptance queues older than 24 hours.' \
@@ -51,6 +55,9 @@ terraform-version:
 test:
 	go test -race ./...
 
+lint:
+	go vet ./...
+
 build:
 	go build ./...
 
@@ -59,6 +66,9 @@ generate:
 
 generate-check: generate
 	git diff --compact-summary --exit-code -- docs examples
+
+validate-examples:
+	bash scripts/validate_examples.sh
 
 security:
 	@set -eu; \
@@ -71,7 +81,7 @@ security:
 	python3 scripts/check_vulnerability_waivers.py "$$result" .security/vulnerability-waivers.yaml
 
 testacc:
-	TF_ACC=1 go test ./... -v $(TESTARGS) -timeout 120m
+	TF_ACC=1 go test ./internal/provider -run '^TestAcc' -v $(TESTARGS) -timeout 120m
 
 cleanupacc:
 	go run ./cmd/clearml-acceptance-cleanup
@@ -125,7 +135,7 @@ define RUN_IN_DEVCONTAINER
 		$(CONTAINER_MAKE) --no-print-directory
 endef
 
-terraform-version test build generate generate-check security testacc cleanupacc: image-ensure cache-dirs
+terraform-version test lint build generate generate-check validate-examples security testacc cleanupacc: image-ensure cache-dirs
 	$(RUN_IN_DEVCONTAINER) $@
 
 endif

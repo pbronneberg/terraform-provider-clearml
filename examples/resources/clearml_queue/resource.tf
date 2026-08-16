@@ -1,8 +1,16 @@
 resource "clearml_queue" "example" {
-  name = "foo"
-}
+  name         = "gpu-production"
+  display_name = "Production GPU queue"
+  tags         = ["gpu", "production"]
 
-resource "clearml_queue" "example_with_tags" {
-  name = "bar"
-  tags = ["one", "two"]
+  metadata = {
+    owner = {
+      type  = "string"
+      value = "ml-platform"
+    }
+    gpu_count = {
+      type  = "integer"
+      value = "4"
+    }
+  }
 }

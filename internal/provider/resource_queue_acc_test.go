@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -9,41 +10,44 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/pbronneberg/terraform-provider-clearml/internal/client"
 )
 
 func TestAccQueueLifecycle(t *testing.T) {
-	if os.Getenv("TF_ACC") != "1" {
-		t.Skip("set TF_ACC=1 to run acceptance tests")
-	}
-	if os.Getenv("CLEARML_ACCESS_KEY") == "" || os.Getenv("CLEARML_SECRET_KEY") == "" {
-		t.Fatal("CLEARML_ACCESS_KEY and CLEARML_SECRET_KEY must be set for acceptance tests")
-	}
+	requireCoreAcceptance(t)
 
 	initialName := acceptanceQueueName(t)
 	updatedName := acceptanceQueueName(t)
 	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
-			"clearml": providerserver.NewProtocol6WithError(New("acceptance")()),
-		},
+		ProtoV6ProviderFactories: acceptanceProviderFactories(),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccQueueConfig(initialName, []string{"acceptance", "initial"}),
+				Config: testAccQueueConfig(initialName, "Initial queue", []string{"acceptance", "initial"}),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttrSet("clearml_queue.test", "id"),
 					resource.TestCheckResourceAttr("clearml_queue.test", "name", initialName),
 					resource.TestCheckResourceAttr("clearml_queue.test", "tags.#", "2"),
+					resource.TestCheckResourceAttr("clearml_queue.test", "metadata.owner.type", "string"),
+					resource.TestCheckResourceAttr("clearml_queue.test", "metadata.owner.value", "platform"),
 				),
 			},
 			{
-				Config: testAccQueueConfig(updatedName, []string{"acceptance", "updated"}),
+				Config:             testAccQueueConfig(updatedName, "", []string{}),
+				ExpectNonEmptyPlan: true,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttrSet("clearml_queue.test", "id"),
 					resource.TestCheckResourceAttr("clearml_queue.test", "name", updatedName),
-					resource.TestCheckResourceAttr("clearml_queue.test", "tags.#", "2"),
+					resource.TestCheckResourceAttr("clearml_queue.test", "display_name", ""),
+					resource.TestCheckResourceAttr("clearml_queue.test", "tags.#", "0"),
+					testAccRemoveRemote("clearml_queue.test", "", func(ctx context.Context, apiClient *client.ClearMLClient, id string) error {
+						return apiClient.DeleteQueue(ctx, id)
+					}),
 				),
+			},
+			{
+				Config: testAccQueueConfig(updatedName, "", []string{}),
+				Check:  resource.TestCheckResourceAttrSet("clearml_queue.test", "id"),
 			},
 			{
 				ResourceName:      "clearml_queue.test",
@@ -75,11 +79,23 @@ func acceptanceQueueName(t *testing.T) string {
 	return fmt.Sprintf("tfacc-clearml-%d-%s-%s-%s-%s", time.Now().UTC().Unix(), version, runID, attempt, hex.EncodeToString(randomBytes[:]))
 }
 
-func testAccQueueConfig(name string, tags []string) string {
+func testAccQueueConfig(name, displayName string, tags []string) string {
+	tagValues := make([]string, len(tags))
+	for index, tag := range tags {
+		tagValues[index] = fmt.Sprintf("%q", tag)
+	}
 	return fmt.Sprintf(`
 resource "clearml_queue" "test" {
-  name = %q
-  tags = [%q, %q]
+  name         = %q
+  display_name = %q
+  tags         = [%s]
+
+  metadata = {
+    owner = {
+      type  = "string"
+      value = "platform"
+    }
+  }
 }
-`, name, tags[0], tags[1])
+`, name, displayName, strings.Join(tagValues, ", "))
 }
