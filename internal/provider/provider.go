@@ -76,11 +76,23 @@ func (p *clearmlProvider) Configure(ctx context.Context, req frameworkprovider.C
 }
 
 func (p *clearmlProvider) Resources(_ context.Context) []func() resource.Resource {
-	return []func() resource.Resource{newQueueResource}
+	return []func() resource.Resource{
+		newProjectResource,
+		newQueueResource,
+		newAccessRuleResource,
+		newResourcePolicyResource,
+		newResourcePolicyProfileConnectionResource,
+	}
 }
 
 func (p *clearmlProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		newProjectDataSource,
+		newQueueDataSource,
+		newServiceAccountDataSource,
+		newUserGroupDataSource,
+		newResourceProfileDataSource,
+	}
 }
 
 func configuredValue(value types.String, environmentVariable, fallback string) string {
