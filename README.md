@@ -1,69 +1,95 @@
 # ClearML Terraform Provider
 
-Terraform provider for managing ClearML queues through the documented ClearML REST API.
+Terraform provider for managing ClearML projects and queues, plus focused
+ClearML Enterprise access and resource-policy configuration.
 
 ## Requirements
 
 - Terraform `>= 1.6`
 - Go `1.26.6` for local development
-- Docker for Make-driven development outside the devcontainer
-- ClearML hosted (`https://api.clear.ml`) or a compatible self-hosted API
+- ClearML hosted (`https://api.clear.ml`) or a compatible self-hosted API for
+  projects and queues
+- ClearML Enterprise for identity lookups, access rules, and resource policies
 
-The v1 provider uses Terraform Plugin Framework and protocol v6. Existing `clearml_queue` configuration, import IDs, and state attributes (`id`, `name`, and `tags`) are preserved from the SDKv2 provider.
+The provider uses Terraform Plugin Framework and protocol v6.
 
 ## Configuration
 
 ```hcl
+terraform {
+  required_providers {
+    clearml = {
+      source  = "pbronneberg/clearml"
+      version = "~> 1.0"
+    }
+  }
+}
+
 provider "clearml" {
-  # api_url    = "https://api.clear.ml" # optional
-  # access_key = var.clearml_access_key  # optional when environment is set
-  # secret_key = var.clearml_secret_key  # optional when environment is set
+  # api_host   = "https://api.clear.ml"
+  # access_key = var.clearml_access_key
+  # secret_key = var.clearml_secret_key
 }
 ```
 
-When omitted, `api_url` defaults to `https://api.clear.ml`; credentials are read from `CLEARML_ACCESS_KEY` and `CLEARML_SECRET_KEY`. Set `CLEARML_API_URL` to target a self-hosted API.
+Explicit provider arguments take precedence over the standard ClearML
+environment variables:
+
+- `api_host` → `CLEARML_API_HOST` → `https://api.clear.ml`
+- `access_key` → `CLEARML_API_ACCESS_KEY`
+- `secret_key` → `CLEARML_API_SECRET_KEY`
+
+## Provider scope
+
+The provider manages hierarchical projects, queues, access rules, resource
+policies, and policy-profile connections. It looks up projects, queues, service
+accounts, user groups, and vendor-provisioned resource profiles by exact name.
+
+ClearML/vendor administrators remain responsible for the resource policy
+manager and profile definitions. Identity providers remain responsible for
+people and group membership. The provider does not manage storage, mounts,
+vaults, human users, service-account creation, resource pools, or the global
+policy manager.
+
+Policy-profile connections create execution queues. Do not manage the same
+queue separately with `clearml_queue`.
+
+See the [registry documentation](docs/index.md) for schemas and examples. Users
+upgrading from `v0.3.2` must follow the [v1 migration guide](docs/guides/v1-migration.md).
 
 ## Development
 
-Open the repository in a Dev Container to use the pinned Go and Terraform
-toolchain, or run the same commands from a host with Docker installed. The
-Makefile detects the devcontainer: host invocations build or reuse it, while
-commands run inside it execute directly.
+Open the repository in its Dev Container, or run the same Make targets from a
+host with Docker installed:
 
 ```sh
 make test
+make lint
 make build
 make generate-check
+make validate-examples
 make security
 ```
 
-The default devcontainer uses Terraform 1.15.8. To run a target with the
-supported minimum version, set `TERRAFORM_VERSION=1.6.6`, for example:
+The default devcontainer uses Terraform 1.15.8. Use
+`TERRAFORM_VERSION=1.6.6` for the supported minimum.
 
-```sh
-make test TERRAFORM_VERSION=1.6.6
-```
+`make testacc` runs live core acceptance tests with
+`CLEARML_API_ACCESS_KEY` and `CLEARML_API_SECRET_KEY`; `CLEARML_API_HOST` is
+optional. Enterprise tests run only when `CLEARML_ENTERPRISE_ACC=1` and the
+required vendor-provisioned IDs are supplied. CI never exposes credentials to
+fork pull requests.
 
-`make testacc` runs live acceptance tests. It requires an explicitly supplied
-ClearML account through `CLEARML_ACCESS_KEY`, `CLEARML_SECRET_KEY`, and, when
-needed, `CLEARML_API_URL`.
+Acceptance objects use a unique `tfacc-clearml-` prefix. Queue cleanup is
+limited to exact CI-owned names older than 24 hours and never force-deletes a
+queue.
 
-CI runs the queue lifecycle acceptance test against ClearML hosted on pushes to
-`main`, scheduled runs, and pull requests from this repository. Fork pull
-requests run the non-credentialed checks only. The workflow maps its GitHub
-secrets `CLEARML_ACCESSKEY` and `CLEARML_SECRETKEY` to the provider's
-underscored environment variable names.
-
-Acceptance queues are named `tfacc-clearml-<timestamp>-<terraform-version>-<run-id>-<attempt>-<random-id>`.
-`make cleanupacc` removes only queues with that exact CI-owned format when they
-are older than 24 hours. It never force-deletes queues; if cleanup fails, keep
-the reported queue for diagnosis and delete it manually from ClearML once it is
-known to be empty.
-
-The provider has fixture-based HTTP contract tests in addition to hosted CI
-acceptance coverage. See [the verification checklist](docs/verification.md) for
-the release-owner live validation procedure and [the release-trust guide](docs/release-trust.md) for signing, approval, provenance, and verification requirements.
+See the [verification checklist](docs/verification.md) and
+[release-trust guide](docs/release-trust.md) for release gates, signing,
+provenance, and SBOM verification.
 
 ## Dependency maintenance
 
-Renovate proposes reviewed dependency updates weekly after a seven-day cooling period. Security alerts may bypass that delay but never auto-merge. Repository administrators must install the Renovate GitHub App for this configuration to run. See [the supply-chain review skill](.github/skills/dependency-supply-chain-review/SKILL.md) for the review workflow.
+Renovate proposes reviewed dependency updates after a seven-day cooling
+period. Security alerts may bypass that delay but never auto-merge. See the
+[supply-chain review skill](.github/skills/dependency-supply-chain-review/SKILL.md).
