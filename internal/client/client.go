@@ -9,11 +9,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
 const maxErrorBodyBytes = 64 << 10
+
+const (
+	invalidProjectID = 401
+	projectNotFound  = 403
+	invalidQueueID   = 701
+)
 
 // ClearMLClient is a minimal client for the ClearML REST API endpoints used by
 // this provider. It deliberately does not retry mutations: a timed-out POST
@@ -27,14 +32,15 @@ type ClearMLClient struct {
 
 // APIError is returned when ClearML responds with a non-success status.
 type APIError struct {
-	StatusCode int
-	Method     string
-	Path       string
-	Message    string
+	StatusCode    int
+	ResultCode    int
+	ResultSubcode int
+	Method        string
+	Path          string
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("ClearML API %s %s returned HTTP %d: %s", e.Method, e.Path, e.StatusCode, e.Message)
+	return fmt.Sprintf("ClearML API %s %s returned HTTP %d: %s", e.Method, e.Path, e.StatusCode, http.StatusText(e.StatusCode))
 }
 
 func NewClearMLClient(ctx context.Context, userAgent, accessKey, secretKey, apiURL string) (*ClearMLClient, error) {
@@ -141,7 +147,17 @@ func (c *ClearMLClient) do(req *http.Request, path string) ([]byte, error) {
 		if readErr != nil {
 			return nil, fmt.Errorf("read ClearML error response: %w", readErr)
 		}
-		return nil, &APIError{StatusCode: response.StatusCode, Method: req.Method, Path: path, Message: strings.TrimSpace(string(body))}
+		var envelope struct {
+			Meta struct {
+				ResultCode    int `json:"result_code"`
+				ResultSubcode int `json:"result_subcode"`
+			} `json:"meta"`
+		}
+		_ = json.Unmarshal(body, &envelope)
+		return nil, &APIError{
+			StatusCode: response.StatusCode, ResultCode: envelope.Meta.ResultCode,
+			ResultSubcode: envelope.Meta.ResultSubcode, Method: req.Method, Path: path,
+		}
 	}
 
 	body, err := io.ReadAll(response.Body)
@@ -152,6 +168,24 @@ func (c *ClearMLClient) do(req *http.Request, path string) ([]byte, error) {
 }
 
 func IsNotFound(err error) bool {
+	var notFound *NotFoundError
+	if errors.As(err, &notFound) {
+		return true
+	}
 	var apiError *APIError
-	return errors.As(err, &apiError) && apiError.StatusCode == http.StatusNotFound
+	if !errors.As(err, &apiError) {
+		return false
+	}
+	if apiError.StatusCode == http.StatusNotFound {
+		return true
+	}
+	if apiError.ResultCode != http.StatusBadRequest {
+		return false
+	}
+	switch apiError.ResultSubcode {
+	case invalidProjectID, projectNotFound, invalidQueueID:
+		return true
+	default:
+		return false
+	}
 }
