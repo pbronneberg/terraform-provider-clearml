@@ -3,23 +3,31 @@
 page_title: "clearml_queue Resource - terraform-provider-clearml"
 subcategory: ""
 description: |-
-  A queue in ClearML.
+  A ClearML task execution queue.
 ---
 
 # clearml_queue (Resource)
 
-A queue in ClearML.
+A ClearML task execution queue.
 
 ## Example Usage
 
 ```terraform
 resource "clearml_queue" "example" {
-  name = "foo"
-}
+  name         = "gpu-production"
+  display_name = "Production GPU queue"
+  tags         = ["gpu", "production"]
 
-resource "clearml_queue" "example_with_tags" {
-  name = "bar"
-  tags = ["one", "two"]
+  metadata = {
+    owner = {
+      type  = "string"
+      value = "ml-platform"
+    }
+    gpu_count = {
+      type  = "integer"
+      value = "4"
+    }
+  }
 }
 ```
 
@@ -28,15 +36,25 @@ resource "clearml_queue" "example_with_tags" {
 
 ### Required
 
-- `name` (String) The name of the queue.
+- `name` (String) The unique queue name.
 
 ### Optional
 
-- `tags` (List of String) Tags to set on the queue.
+- `display_name` (String) An optional human-readable queue name. Omit it to preserve the remote value.
+- `metadata` (Map of Object) Typed metadata keyed by metadata key. Omit it to preserve the remote value. (see [below for nested schema](#nestedatt--metadata))
+- `tags` (Set of String) User-defined tags. Omit them to preserve the remote value.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+
+<a id="nestedatt--metadata"></a>
+### Nested Schema for `metadata`
+
+Optional:
+
+- `type` (String)
+- `value` (String)
 
 ## Import
 
@@ -45,5 +63,5 @@ Import is supported using the following syntax:
 The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
-terraform import clearml_queue.example acbd18db4cc2f85cedef654fccc4a4d8
+terraform import clearml_queue.example queue-id
 ```

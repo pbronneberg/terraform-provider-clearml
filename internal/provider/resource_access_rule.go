@@ -50,6 +50,7 @@ func (r *accessRuleResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"description": schema.StringAttribute{Required: true},
 			"entity_type": schema.StringAttribute{
 				Required: true, Validators: []validator.String{stringvalidator.OneOf(accessEntityTypes...)},
+				Description: "Protected ClearML entity type.",
 			},
 			"entity_id": schema.StringAttribute{
 				Optional:    true,
@@ -57,6 +58,7 @@ func (r *accessRuleResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"permission": schema.StringAttribute{
 				Required: true, Validators: []validator.String{stringvalidator.OneOf("read", "read_write")},
+				Description: "Access level: read or read_write.",
 			},
 			"group_ids": schema.SetAttribute{
 				Optional: true, ElementType: types.StringType,

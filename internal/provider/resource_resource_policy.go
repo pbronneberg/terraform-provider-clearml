@@ -35,7 +35,7 @@ func (r *resourcePolicyResource) Metadata(_ context.Context, req resource.Metada
 
 func (r *resourcePolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A ClearML Enterprise resource policy for one user group.",
+		Description: "A ClearML Enterprise resource policy for one user group. The vendor-managed resource policy manager must be enabled.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{Computed: true},
 			"name": schema.StringAttribute{

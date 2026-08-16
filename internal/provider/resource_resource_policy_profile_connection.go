@@ -45,7 +45,7 @@ func requiredReplacement(description string) schema.StringAttribute {
 
 func (r *resourcePolicyProfileConnectionResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Connects a ClearML Enterprise resource policy to a vendor-provisioned profile and creates its execution queue.",
+		Description: "Connects a ClearML Enterprise resource policy to a vendor-provisioned profile and creates its execution queue. The vendor-managed resource policy manager must be enabled. Do not also manage the generated queue as clearml_queue.",
 		Attributes: map[string]schema.Attribute{
 			"policy_id":  requiredReplacement("Resource policy ID."),
 			"profile_id": requiredReplacement("Resource profile ID."),

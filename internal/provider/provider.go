@@ -33,22 +33,25 @@ func (p *clearmlProvider) Metadata(_ context.Context, _ frameworkprovider.Metada
 }
 
 func (p *clearmlProvider) Schema(_ context.Context, _ frameworkprovider.SchemaRequest, resp *frameworkprovider.SchemaResponse) {
-	resp.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"api_host": schema.StringAttribute{
-			Optional:    true,
-			Description: "ClearML API host. Defaults to CLEARML_API_HOST, then https://api.clear.ml.",
+	resp.Schema = schema.Schema{
+		Description: "Manages ClearML projects, execution queues, and focused Enterprise access and resource-policy configuration.",
+		Attributes: map[string]schema.Attribute{
+			"api_host": schema.StringAttribute{
+				Optional:    true,
+				Description: "ClearML API host. Defaults to CLEARML_API_HOST, then https://api.clear.ml.",
+			},
+			"access_key": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "ClearML access key. Defaults to CLEARML_API_ACCESS_KEY when unset.",
+			},
+			"secret_key": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "ClearML secret key. Defaults to CLEARML_API_SECRET_KEY when unset.",
+			},
 		},
-		"access_key": schema.StringAttribute{
-			Optional:    true,
-			Sensitive:   true,
-			Description: "ClearML access key. Defaults to CLEARML_API_ACCESS_KEY when unset.",
-		},
-		"secret_key": schema.StringAttribute{
-			Optional:    true,
-			Sensitive:   true,
-			Description: "ClearML secret key. Defaults to CLEARML_API_SECRET_KEY when unset.",
-		},
-	}}
+	}
 }
 
 func (p *clearmlProvider) Configure(ctx context.Context, req frameworkprovider.ConfigureRequest, resp *frameworkprovider.ConfigureResponse) {

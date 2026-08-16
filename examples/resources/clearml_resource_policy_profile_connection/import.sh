@@ -1,0 +1,1 @@
+terraform import clearml_resource_policy_profile_connection.gpu_small resource-policy-id/queue-id
