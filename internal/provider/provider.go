@@ -18,7 +18,7 @@ type clearmlProvider struct {
 }
 
 type providerModel struct {
-	APIURL    types.String `tfsdk:"api_url"`
+	APIHost   types.String `tfsdk:"api_host"`
 	AccessKey types.String `tfsdk:"access_key"`
 	SecretKey types.String `tfsdk:"secret_key"`
 }
@@ -34,19 +34,19 @@ func (p *clearmlProvider) Metadata(_ context.Context, _ frameworkprovider.Metada
 
 func (p *clearmlProvider) Schema(_ context.Context, _ frameworkprovider.SchemaRequest, resp *frameworkprovider.SchemaResponse) {
 	resp.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"api_url": schema.StringAttribute{
+		"api_host": schema.StringAttribute{
 			Optional:    true,
-			Description: "ClearML API URL. Defaults to https://api.clear.ml.",
+			Description: "ClearML API host. Defaults to CLEARML_API_HOST, then https://api.clear.ml.",
 		},
 		"access_key": schema.StringAttribute{
 			Optional:    true,
 			Sensitive:   true,
-			Description: "ClearML access key. Defaults to CLEARML_ACCESS_KEY when unset.",
+			Description: "ClearML access key. Defaults to CLEARML_API_ACCESS_KEY when unset.",
 		},
 		"secret_key": schema.StringAttribute{
 			Optional:    true,
 			Sensitive:   true,
-			Description: "ClearML secret key. Defaults to CLEARML_SECRET_KEY when unset.",
+			Description: "ClearML secret key. Defaults to CLEARML_API_SECRET_KEY when unset.",
 		},
 	}}
 }
@@ -58,11 +58,11 @@ func (p *clearmlProvider) Configure(ctx context.Context, req frameworkprovider.C
 		return
 	}
 
-	apiURL := configuredValue(config.APIURL, "CLEARML_API_URL", "https://api.clear.ml")
-	accessKey := configuredValue(config.AccessKey, "CLEARML_ACCESS_KEY", "")
-	secretKey := configuredValue(config.SecretKey, "CLEARML_SECRET_KEY", "")
+	apiURL := configuredValue(config.APIHost, "CLEARML_API_HOST", "https://api.clear.ml")
+	accessKey := configuredValue(config.AccessKey, "CLEARML_API_ACCESS_KEY", "")
+	secretKey := configuredValue(config.SecretKey, "CLEARML_API_SECRET_KEY", "")
 	if accessKey == "" || secretKey == "" {
-		resp.Diagnostics.AddError("Missing ClearML credentials", "Set access_key and secret_key or the CLEARML_ACCESS_KEY and CLEARML_SECRET_KEY environment variables.")
+		resp.Diagnostics.AddError("Missing ClearML credentials", "Set access_key and secret_key or the CLEARML_API_ACCESS_KEY and CLEARML_API_SECRET_KEY environment variables.")
 		return
 	}
 
